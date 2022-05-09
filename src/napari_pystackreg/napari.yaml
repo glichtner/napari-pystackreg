@@ -1,0 +1,17 @@
+name: napari-pystackreg
+display_name: napari pystackreg
+contributions:
+  commands:
+    - id: napari-pystackreg.pystackreg
+      python_name: napari_pystackreg._widget:PystackregWidget
+      title: pystackreg
+    - id: napari-pystackreg.load_sample_data
+      title: Load PC12 cell example
+      python_name: napari_pystackreg._sample_data:load_sample_data
+  sample_data:
+    - display_name: PC12 moving example
+      key: pc12
+      command: napari-pystackreg.load_sample_data
+  widgets:
+    - command: napari-pystackreg.pystackreg
+      display_name: pystackreg
