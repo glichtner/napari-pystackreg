@@ -8,9 +8,26 @@ Replace code below according to your needs.
 """
 from __future__ import annotations
 
-import numpy
+from typing import List
+
+from napari.types import LayerData
+from skimage.io import imread
+
+SAMPLE_DATA_URI = (
+    "https://github.com/glichtner/pystackreg/raw/"
+    "28d4c625e8542cddae8c3e8b9ad85dce0ef46147/"
+    "examples/data/pc12-unreg.tif"
+)
 
 
-def make_sample_data():
-    """Generates an image"""
-    return numpy.random.rand(512, 512)
+def load_sample_data() -> List[LayerData]:
+    """
+    Load sample data from github
+
+    :return:
+    """
+    data = imread(SAMPLE_DATA_URI)
+
+    return [
+        (data, {"name": "PC12 cells sample"}, "image"),
+    ]

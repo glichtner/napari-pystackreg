@@ -2,34 +2,16 @@ name: napari-pystackreg
 display_name: napari pystackreg
 contributions:
   commands:
-    - id: napari-pystackreg.get_reader
-      python_name: napari_pystackreg._reader:napari_get_reader
-      title: Open data with napari pystackreg
-    - id: napari-pystackreg.make_sample_data
-      python_name: napari_pystackreg._sample_data:make_sample_data
-      title: Load sample data from napari pystackreg 
-    - id: napari-pystackreg.make_qwidget
-      python_name: napari_pystackreg._widget:ExampleQWidget
-      title: Make example QWidget
-    - id: napari-pystackreg.make_magic_widget
-      python_name: napari_pystackreg._widget:example_magic_widget
-      title: Make example magic widget
-    - id: napari-pystackreg.make_func_widget
-      python_name: napari_pystackreg._widget:example_function_widget
-      title: Make example function widget 
-  readers:
-    - command: napari-pystackreg.get_reader
-      accepts_directories: false
-      filename_patterns: ['*.npy']  
+    - id: napari-pystackreg.pystackreg
+      python_name: napari_pystackreg._widget:pystackreg
+      title: pystackreg
+    - id: napari-pystackreg.load_sample_data
+      title: Load PC12 cell example
+      python_name: napari_pystackreg._sample_data:load_sample_data
   sample_data:
-    - command: napari-pystackreg.make_sample_data
-      display_name: napari pystackreg
-      key: unique_id.1 
+    - display_name: PC12 moving example
+      key: pc12
+      command: napari-pystackreg.load_sample_data
   widgets:
-    - command: napari-pystackreg.make_qwidget
-      display_name: Example QWidget
-    - command: napari-pystackreg.make_magic_widget
-      display_name: Example Magic Widget
-    - command: napari-pystackreg.make_func_widget
-      autogenerate: true
-      display_name: Example Function Widget 
+    - command: napari-pystackreg.pystackreg
+      display_name: pystackreg
