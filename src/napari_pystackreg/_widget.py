@@ -7,356 +7,256 @@ see: https://napari.org/plugins/guides.html?#widgets
 Replace code below according to your needs.
 """
 import os
-import sys
-from concurrent.futures import Future
-from typing import List
 
-import numpy as np
-from magicgui import _magicgui, magicgui, register_type, widgets
-from napari.qt.threading import thread_worker
-from napari.types import ImageData, LayerDataTuple
-from napari.utils.notifications import show_info
-
-_Future = Future
-if sys.version_info < (3, 9):
-    # proxy type because Future is not subscriptable in Python 3.8 or lower
-    _Future = List
-    # register proxy type with magicgui
-    register_type(
-        _Future[List[LayerDataTuple]],
-        return_callback=_magicgui.add_future_data,
-    )
+import napari
+from qtpy.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
-def pystackreg():
-
-    references = {
+class PystackregWidget(QWidget):
+    REFERENCES = {
         "previous": "Previous frame",
         "mean": "Mean (all frames)",
         "first": "Mean (first n frames)",
     }
 
-    @magicgui(
-        image=dict(label="Image"),
-        transformation=dict(
-            widget_type="ComboBox",
-            label="Transformation Type",
-            tooltip="test",  # TODO
-            choices=[
+    def __init__(self, napari_viewer):
+        super().__init__()
+        self.viewer = napari_viewer
+        self.viewer.events.layers_change.connect(self._on_layer_change)
+
+        layout = QFormLayout()
+        self.setLayout(layout)
+
+        # Raw data layer
+        self.image = QComboBox()
+        layout.addRow(QLabel("Image Stack"), self.image)
+
+        # Transformation
+        self.transformation = QComboBox()
+        self.transformation.setToolTip("test")  # todo
+        self.transformation.addItems(
+            [
                 "translation",
                 "rigid body",
                 "scaled rotation",
                 "affine",
                 "bilinear",
-            ],
-            value="affine",
-        ),
-        reference=dict(
-            widget_type="ComboBox",
-            label="Reference Frame",
-            tooltip="add-me",  # TODO
-            choices={
-                "choices": references.keys(),
-                "key": lambda k: references[k],
-            },
-            value="previous",
-        ),
-        n_frames=dict(
-            widget_type="SpinBox",
-            min=1,
-            max=100,
-            value=1,
-            label="First n frames for reference",
-            visible=False,
-        ),
-        perform_moving_average=dict(
-            widget_type="CheckBox",
-            label="Moving-average stack before register",
-            value=False,
-        ),
-        moving_average=dict(
-            widget_type="SpinBox",
-            min=1,
-            max=100,
-            value=1,
-            label="Frames in moving average",
-            visible=False,
-        ),
-        store_transformation_matrix=dict(
-            widget_type="CheckBox",
-            label="Save/Load transformation matrix to/from file",
-            value=False,
-        ),
-        status=dict(
-            widget_type="Label",
-            value="None",
-            label="Current transformation matrix",
-        ),
-        btn_register=dict(widget_type="PushButton", label="Register"),
-        btn_transform=dict(widget_type="PushButton", label="Transform"),
-        btn_register_transform=dict(
-            widget_type="PushButton", label="Register && Transform"
-        ),
-        action=dict(
-            widget_type="ComboBox",
-            visible=False,
-            choices=["register", "transform", "register_transform"],
-        ),
-        pbar=dict(visible=False, max=0, label="Registering..."),
-        auto_call=False,
-        call_button=False,
-        layout="vertical",
-    )
-    def pystackreg_widget(
-        image: ImageData,
-        transformation,
-        reference,
-        n_frames,
-        perform_moving_average,
-        moving_average,
-        store_transformation_matrix,
-        status,
-        btn_register,
-        btn_transform,
-        btn_register_transform,
-        action,
-        pbar: widgets.ProgressBar,
-    ) -> _Future[ImageData]:
-        from pystackreg import StackReg
-        from pystackreg.util import running_mean, simple_slice
-
-        future = Future()
-
-        if image is None or len(image.shape) <= 2:
-            show_info("An image stack is required for registration")
-            return future
-
-        if action == "transform" and pystackreg_widget.tmats is None:
-            show_info("Need to register before transformation")
-            return future
-
-        if action == "transform":
-            print(pystackreg_widget.tmats.shape)
-            print(image.shape)
-
-        if (
-            action == "transform"
-            and image.shape[0] != pystackreg_widget.tmats.shape[0]
-        ):
-            show_info(
-                f"Mismatch between number of frames in selected image "
-                f"({image.shape[0]}) and "
-                f"saved transformation matrix "
-                f"({pystackreg_widget.tmats.shape[0]})"
-            )
-            return future
-
-        pbar.range = (0, image.shape[0] - 1)
-
-        if action == "transform":
-            if not hasattr(pystackreg_widget, "tmats"):
-                print("no tmat provided")
-                return
-
-        @thread_worker(connect={"returned": pbar.hide}, start_thread=False)
-        def _register_stack(image) -> ImageData:
-            transformations = {
-                "translation": StackReg.TRANSLATION,
-                "rigid body": StackReg.RIGID_BODY,
-                "scaled rotation": StackReg.SCALED_ROTATION,
-                "affine": StackReg.AFFINE,
-                "bilinear": StackReg.BILINEAR,
-            }
-
-            sr = StackReg(transformations[transformation])
-
-            axis = 0
-
-            if action in ["register", "register_transform"]:
-
-                idx_start = 1
-
-                if moving_average > 1:
-                    idx_start = 0
-                    size = [0] * len(image.shape)
-                    size[axis] = moving_average
-                    image = running_mean(image, moving_average, axis=axis)
-
-                tmatdim = 4 if transformation == "bilinear" else 3
-
-                tmats = np.repeat(
-                    np.identity(tmatdim).reshape((1, tmatdim, tmatdim)),
-                    image.shape[axis],
-                    axis=0,
-                ).astype(np.double)
-
-                if reference == "first":
-                    ref = np.mean(
-                        image.take(range(n_frames), axis=axis), axis=axis
-                    )
-                elif reference == "mean":
-                    ref = image.mean(axis=0)
-                    idx_start = 0
-                elif reference == "previous":
-                    pass
-                else:
-                    raise ValueError(f'Unknown reference "{reference}"')
-
-                pbar.label = "Registering..."
-
-                iterable = range(idx_start, image.shape[axis])
-
-                for i in iterable:
-
-                    slc = [slice(None)] * len(image.shape)
-                    slc[axis] = i
-
-                    if reference == "previous":
-                        ref = image.take(i - 1, axis=axis)
-
-                    tmats[i, :, :] = sr.register(
-                        ref, simple_slice(image, i, axis)
-                    )
-
-                    if reference == "previous" and i > 0:
-                        tmats[i, :, :] = np.matmul(
-                            tmats[i, :, :], tmats[i - 1, :, :]
-                        )
-
-                    yield i - idx_start + 1
-
-                layer_name = pystackreg_widget.image.current_choice.replace(
-                    " (data)", ""
-                )
-                pystackreg_widget.tmats = tmats
-                pystackreg_widget.status.value = (
-                    f'Registered "{layer_name}" [{transformation}]'
-                )
-                btn_save_tmat.enabled = True
-
-            if action in ["transform", "register_transform"]:
-                tmats = pystackreg_widget.tmats
-
-                # transform
-
-                out = image.copy().astype(np.float)
-
-                pbar.label = "Transforming..."
-                yield 0  # reset pbar
-
-                for i in range(image.shape[axis]):
-                    slc = [slice(None)] * len(out.shape)
-                    slc[axis] = i
-                    out[tuple(slc)] = sr.transform(
-                        simple_slice(image, i, axis), tmats[i, :, :]
-                    )
-                    yield i
-
-                return out
-
-        def on_yield(x):
-            pbar.value = x
-
-        worker = _register_stack(image)
-        worker.yielded.connect(on_yield)
-        worker.returned.connect(future.set_result)
-        worker.start()
-
-        pbar.show()
-
-        return future
-
-    @pystackreg_widget.perform_moving_average.changed.connect
-    def perform_moving_average_onchange(value: bool):
-        pystackreg_widget.moving_average.visible = value
-
-    @pystackreg_widget.reference.changed.connect
-    def reference_onchange(value: str):
-        pystackreg_widget.n_frames.visible = value == "first"
-
-    @pystackreg_widget.store_transformation_matrix.changed.connect
-    def store_transformation_matrix_onchange(value: bool):
-        container.visible = value
-
-    @pystackreg_widget.transformation.changed.connect
-    def transformation_onchange(value: str):
-        def without(d, key):
-            new_d = d.copy()
-            new_d.pop(key)
-            return new_d
-
-        if value == "bilinear":
-            refs = without(references, "previous")
-        else:
-            refs = references
-
-        pystackreg_widget.reference.choices = {
-            "choices": refs.keys(),
-            "key": lambda k: refs[k],
-        }
-
-    def change_button_accessibility(value: bool):
-        pystackreg_widget.btn_register.enabled = value
-        pystackreg_widget.btn_transform.enabled = value
-        pystackreg_widget.btn_register_transform.enabled = value
-
-    @pystackreg_widget.btn_register.changed.connect
-    def btn_register_onclick(value: bool):
-        pystackreg_widget.action.value = "register"
-        change_button_accessibility(False)
-        try:
-            pystackreg_widget()
-        finally:
-            change_button_accessibility(True)
-
-    @pystackreg_widget.btn_transform.changed.connect
-    def btn_transform_onclick(value: bool):
-        pystackreg_widget.action.value = "transform"
-        change_button_accessibility(False)
-        try:
-            pystackreg_widget()
-        finally:
-            change_button_accessibility(True)
-
-    @pystackreg_widget.btn_register_transform.changed.connect
-    def btn_register_transform_onclick(value: bool):
-        pystackreg_widget.action.value = "register_transform"
-        change_button_accessibility(False)
-        try:
-            pystackreg_widget()
-        finally:
-            change_button_accessibility(True)
-
-    file_tmat = widgets.FileEdit(mode="w", name="filename")
-    btn_save_tmat = widgets.PushButton(label="Save", enabled=False)
-    btn_load_tmat = widgets.PushButton(label="Load", enabled=True)
-
-    @btn_save_tmat.changed.connect
-    def btn_save_tmat_onclick(value: bool):
-        tmats = pystackreg_widget.tmats
-        print(tmats)
-        print(file_tmat.value)
-
-    @btn_load_tmat.changed.connect
-    def btn_load_tmat_onclick(value: bool):
-        print(file_tmat.value)
-        pystackreg_widget.status.value = (
-            f'Loaded from "{os.path.basename(file_tmat.value)}"'
+            ]
         )
-        btn_save_tmat.enabled = True  # after loading, we can save ..
+        # default value = affine # todo
+        layout.addRow(QLabel("Transformation"), self.transformation)
 
-    @pystackreg_widget.image.changed.connect
-    def image_onchange(value):
-        pystackreg_widget.n_frames.max = value.shape[0]
-        pystackreg_widget.moving_average.max = value.shape[0]
+        # Reference
+        self.reference = QComboBox()
+        self.reference.setToolTip("test")  # todo
+        for k, v in self.REFERENCES.items():
+            self.reference.addItem(v, k)
+        # default value = previous # todo
+        layout.addRow(QLabel("Reference frame"), self.reference)
 
-    container = widgets.Container(
-        label="Transformation matrix",
-        layout="vertical",
-        visible=False,
-        widgets=[file_tmat, btn_save_tmat, btn_load_tmat],
-    )
+        # N Frames
+        self.n_frames = QSpinBox()
+        self.n_frames.setVisible(False)
+        self.n_frames.setMinimum(1)
+        self.n_frames_label = QLabel("First n frames for reference")
+        self.n_frames_label.setVisible(False)
+        layout.addRow(self.n_frames_label, self.n_frames)
 
-    pystackreg_widget.insert(7, container)
+        # Perform moving average
+        self.perform_moving_average = QCheckBox(
+            "Moving-average stack before register"
+        )
+        self.perform_moving_average.setChecked(False)
+        layout.addRow(self.perform_moving_average)
 
-    return pystackreg_widget
+        self.moving_average_label = QLabel("Frames in moving average")
+        self.moving_average = QSpinBox()
+        self.moving_average_label.setVisible(False)
+        self.moving_average.setVisible(False)
+        self.moving_average.setMinimum(1)
+        layout.addRow(self.moving_average_label, self.moving_average)
+
+        def connect_visibility_to_checkbox(
+            state, widget1, widget2=None, inverse=False
+        ):
+            widget1.setVisible(state ^ inverse)
+            if widget2 is not None:
+                widget2.setVisible(state ^ inverse)
+
+        self.perform_moving_average.stateChanged.connect(
+            lambda state: connect_visibility_to_checkbox(
+                state, self.moving_average_label, self.moving_average
+            )
+        )
+
+        # Transformation Matrix from/to file
+
+        self.store_transformation_matrix = QCheckBox(
+            "Save/Load transformation matrix to/from file"
+        )
+        self.store_transformation_matrix.setChecked(False)
+        layout.addRow(self.store_transformation_matrix)
+
+        self.tmat_label = QLabel("Transformation matrix")
+        helperWidget = QWidget()
+        self.tmat_layout = QVBoxLayout(helperWidget)
+        self.tmat_filename_layout = QHBoxLayout()
+        self.tmat_filename_text = QLineEdit()
+        self.tmat_filename_select = QPushButton("Select..")
+        self.tmat_filename_layout.addWidget(self.tmat_filename_text)
+        self.tmat_filename_layout.addWidget(self.tmat_filename_select)
+
+        def set_filename(value):
+            self.tmat_filename_text.setText(
+                QFileDialog.getOpenFileName(self, "Open file")[0]
+            )
+
+        self.tmat_filename_select.clicked.connect(set_filename)
+
+        row = QHBoxLayout()
+
+        self.tmat_load = QPushButton("Load")
+        self.tmat_save = QPushButton("Save")
+        self.tmat_save.setEnabled(False)
+        row.addWidget(self.tmat_load)
+        row.addWidget(self.tmat_save)
+        self.tmat_layout.addLayout(self.tmat_filename_layout)
+        self.tmat_layout.addLayout(row)
+
+        layout.addRow(self.tmat_label, helperWidget)
+        self.store_transformation_matrix.stateChanged.connect(
+            lambda state: connect_visibility_to_checkbox(
+                state, self.tmat_label, helperWidget
+            )
+        )
+        self.tmat_label.setVisible(False)
+        helperWidget.setVisible(False)
+
+        self.status = QLabel()
+        layout.addRow(QLabel("Current transformation matrix"), self.status)
+
+        self.btn_register = QPushButton("Register")
+        layout.addRow(self.btn_register)
+
+        self.btn_transform = QPushButton("Transform")
+        layout.addRow(self.btn_transform)
+
+        self.btn_register_transform = QPushButton("Register && Transform")
+        layout.addRow(self.btn_register_transform)
+
+        self.pbar = QProgressBar()
+        self.pbar.setVisible(False)
+        layout.addRow(self.pbar)
+
+        def reference_onchange(value: str):
+            visible = self.reference.currentData() == "first"
+            self.n_frames.setVisible(visible)
+            self.n_frames_label.setVisible(visible)
+
+        self.reference.currentIndexChanged.connect(reference_onchange)
+
+        def transformation_onchange(value: str):
+            def without(d, key):
+                new_d = d.copy()
+                new_d.pop(key)
+                return new_d
+
+            if value == "bilinear":
+                refs = without(self.REFERENCES, "previous")
+            else:
+                refs = self.REFERENCES
+
+            self.reference.clear()
+            for k, v in refs.items():
+                self.reference.addItem(v, k)
+
+        self.transformation.currentIndexChanged.connect(
+            transformation_onchange
+        )
+
+        def change_button_accessibility(value: bool):
+            self.btn_register.setEnabled(value)
+            self.btn_transform.setEnabled(value)
+            self.btn_register_transform.setEnabled(value)
+
+        def btn_register_onclick(value: bool):
+            change_button_accessibility(False)
+            try:
+                print("register")
+            finally:
+                change_button_accessibility(True)
+
+        self.btn_register.clicked.connect(btn_register_onclick)
+
+        def btn_transform_onclick(value: bool):
+            change_button_accessibility(False)
+            # run transform
+            try:
+                print("transform")
+            finally:
+                change_button_accessibility(True)
+
+        self.btn_transform.clicked.connect(btn_transform_onclick)
+
+        def btn_register_transform_onclick(value: bool):
+            change_button_accessibility(False)
+            try:
+                print("register_transform")
+            finally:
+                change_button_accessibility(True)
+
+        self.btn_register_transform.clicked.connect(
+            btn_register_transform_onclick
+        )
+
+        def btn_save_tmat_onclick(value: bool):
+            print("save")
+
+        self.tmat_save.clicked.connect(btn_save_tmat_onclick)
+
+        def btn_load_tmat_onclick(value: bool):
+            fname = os.path.basename(self.tmat_filename_text.text)
+            self.status.value = f'Loaded from "{fname}"'
+            self.tmat_save.enabled = True  # after loading, we can save ..
+
+        self.tmat_load.clicked.connect(btn_load_tmat_onclick)
+
+        def image_onchange(value):
+            self.n_frames.setMaximum(self.image.currentData().shape[0])
+            self.moving_average.setMaximum(self.image.currentData().shape[0])
+
+        self.image.currentIndexChanged.connect(image_onchange)
+
+    def _on_layer_change(self, e):
+        self.image.clear()
+        for x in self.viewer.layers:
+            if (
+                isinstance(x, napari.layers.image.image.Image)
+                and len(x.data.shape) > 2
+            ):
+                self.image.addItem(x.name, x.data)
+
+        if self.image.count() < 1:
+            self.btn_register.setEnabled(False)
+            self.btn_transform.setEnabled(False)
+            self.btn_register_transform.setEnabled(False)
+        else:
+            self.btn_register.setEnabled(True)
+            self.btn_transform.setEnabled(True)
+            self.btn_register_transform.setEnabled(True)
+
+    def _on_click(self):
+        print("napari has", len(self.viewer.layers), "layers")

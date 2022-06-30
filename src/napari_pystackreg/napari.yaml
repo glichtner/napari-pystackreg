@@ -3,7 +3,7 @@ display_name: napari pystackreg
 contributions:
   commands:
     - id: napari-pystackreg.pystackreg
-      python_name: napari_pystackreg._widget:pystackreg
+      python_name: napari_pystackreg._widget:PystackregWidget
       title: pystackreg
     - id: napari-pystackreg.load_sample_data
       title: Load PC12 cell example
