@@ -15,6 +15,7 @@ import numpy as np
 from magicgui import _magicgui, magicgui, register_type, widgets
 from napari.qt.threading import thread_worker
 from napari.types import ImageData, LayerDataTuple
+from napari.utils.notifications import show_info
 
 _Future = Future
 if sys.version_info < (3, 9):
@@ -25,48 +26,6 @@ if sys.version_info < (3, 9):
         _Future[List[LayerDataTuple]],
         return_callback=_magicgui.add_future_data,
     )
-
-
-def simple_slice(arr, inds, axis):
-    """
-    Take elements from an array along an axis.
-    This does the same as np.take() except only supports simple slicing, not
-    advanced indexing, and thus is much faster
-    :type arr: array_like (Ni..., M, Nk...)
-    :param arr: The source array to slice from
-    :type inds: int or array_like (Nj...)
-    :param inds:
-        The indices of the values to extract
-    :type axis: int
-    :param axis: The axis over which to select values
-    :rtype:  ndarray(Ni..., Nj..., Nk...)
-    :return: The returned array has the same type as arr
-    """
-
-    sl = [slice(None)] * arr.ndim
-    sl[axis] = inds
-    return arr[tuple(sl)]
-
-
-def running_mean(x, N, axis=0):
-    """
-    Calculate running mean (=moving average) across a given axis.
-    The array is padded with the first and last value such that
-    the resulting running mean has the same dimensions as the input array.
-    :type x: array_like (Ni..., Nj..., Nk...)
-    :param x: The source array
-    :type N: int
-    :param N:
-        Number of elements to average over
-    :type axis: int, optional
-    :param axis: The axis across which the running mean is calculated
-    :rtype:  ndarray(Ni..., Nj..., Nk...)
-    :return: The returned array has the same shape and type as x
-    """
-    pad_width = [[0, 0]] * len(x.shape)
-    pad_width[axis] = [int(np.ceil(N / 2)), int(np.floor(N / 2))]
-    cumsum = np.cumsum(np.pad(x, pad_width, "edge"), axis=axis)
-    return (cumsum[N:] - cumsum[:-N]) / float(N)
 
 
 def pystackreg():
@@ -164,8 +123,33 @@ def pystackreg():
         pbar: widgets.ProgressBar,
     ) -> _Future[ImageData]:
         from pystackreg import StackReg
+        from pystackreg.util import running_mean, simple_slice
 
         future = Future()
+
+        if image is None or len(image.shape) <= 2:
+            show_info("An image stack is required for registration")
+            return future
+
+        if action == "transform" and pystackreg_widget.tmats is None:
+            show_info("Need to register before transformation")
+            return future
+
+        if action == "transform":
+            print(pystackreg_widget.tmats.shape)
+            print(image.shape)
+
+        if (
+            action == "transform"
+            and image.shape[0] != pystackreg_widget.tmats.shape[0]
+        ):
+            show_info(
+                f"Mismatch between number of frames in selected image "
+                f"({image.shape[0]}) and "
+                f"saved transformation matrix "
+                f"({pystackreg_widget.tmats.shape[0]})"
+            )
+            return future
 
         pbar.range = (0, image.shape[0] - 1)
 
