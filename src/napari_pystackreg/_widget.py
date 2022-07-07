@@ -339,7 +339,7 @@ class PystackregWidget(QWidget):
             if self.perform_moving_average.isChecked()
             else 1
         )
-        print(moving_average)
+
         n_frames = self.n_frames.value()
         reference = self.reference.currentData()
 

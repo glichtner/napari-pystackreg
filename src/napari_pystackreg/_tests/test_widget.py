@@ -108,7 +108,9 @@ def test_pystackreg_widget(
         transformations.index(stack["transformation"])
     )
     if stack["transformation"] == "bilinear":
+        references.remove("previous")
         widget.reference.setCurrentIndex(references.index("first"))
+
     widget._btn_register_transform_onclick(True)
 
     with qtbot.waitSignal(
