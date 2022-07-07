@@ -323,7 +323,7 @@ class PystackregWidget(QWidget):
         import numpy as np
         from napari.qt import thread_worker
         from pystackreg import StackReg
-        from pystackreg.util import running_mean, simple_slice
+        from pystackreg.util import running_mean, simple_slice, to_int_dtype
 
         transformations = {
             "translation": StackReg.TRANSLATION,
@@ -434,6 +434,10 @@ class PystackregWidget(QWidget):
                         simple_slice(image, i, axis), tmats[i, :, :]
                     )
                     yield i
+
+                # convert to original dtype
+                if np.issubdtype(image.dtype, np.integer):
+                    out = to_int_dtype(out, image.dtype)
 
                 return out
 
