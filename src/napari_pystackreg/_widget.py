@@ -251,7 +251,7 @@ class PystackregWidget(QWidget):
             new_d.pop(key)
             return new_d
 
-        if value == "bilinear":
+        if self.transformation.currentData() == "bilinear":
             refs = without(self.REFERENCES, "previous")
         else:
             refs = self.REFERENCES
