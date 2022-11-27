@@ -80,6 +80,25 @@ def stack_unregistered(tmp_path_factory):
     yield load_file(tmp_path_factory, "unreg")
 
 
+def test_pystackreg_widget_no_layer(
+    monkeypatch,
+    tmp_path,
+    qtbot,
+    make_napari_viewer,
+    stack_unregistered,
+    stack_affine,
+    tmat_affine,
+):
+    viewer, widget = _setup_viewer(make_napari_viewer, stack_unregistered)
+
+    assert widget.btn_register.isEnabled() is True
+
+    # remove the layer
+    viewer.layers.clear()
+
+    assert widget.btn_register.isEnabled() is False
+
+
 @pytest.fixture(
     params=[
         "translation",
