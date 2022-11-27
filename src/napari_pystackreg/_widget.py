@@ -21,7 +21,7 @@ from qtpy.QtWidgets import (
 from _util import patch_worker_for_coverage
 
 running_coverage = (
-    "coverage" in sys.modules
+    "coverage" in sys.modules or "pytest" in sys.modules
 )  # detect if coverage is running to enable correct handling of QThreads
 
 
