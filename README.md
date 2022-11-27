@@ -14,6 +14,8 @@ Summary
 napari-pystackreg offers the image registration capabilities of the python package
 [pystackreg](https://github.com/glichtner/pystackreg) for napari.
 
+![](https://github.com/glichtner/napari-pystackreg/raw/update-docs/docs/napari-pystackreg.gif)
+
 Description
 -----------
 pyStackReg is used to align (register) one or more images to a common reference image, as is required usually in
@@ -41,6 +43,61 @@ bilinear transformation when using "previous" image as reference image. You can 
 separately to its respective previous image (and use the already transformed previous image as reference for the
 next image).
 
+Installation
+------------
+You can install ``napari-pystackreg`` via [pip](https://pypi.org/project/pip/) from [PyPI](https://pypi.org/):
+
+    pip install napari-pystackreg
+
+You can also install ``napari-pystackreg`` via [conda](https://docs.conda.io/en/latest/):
+
+    conda install -c conda-forge napari-pystackreg
+
+Or install it via napari's plugin installer.
+
+    Plugins > Install/Uninstall Plugins... > Filter for "napari-pystackreg" > Install
+
+
+Usage
+-----
+
+### Open Plugin User Interface
+
+Start up napari, e.g. from the command line:
+
+    napari
+
+Then, load an image stack (e.g. via ``File > Open Image...``) that you want to register. You can also use the example
+stack provided by the pluging (``File > Open Sample > napari-pystackreg: PC12 moving example``).
+Then, select the ``napari-pystackreg`` plugin from the ``Plugins > napari-pystackreg: pystackreg`` menu.
+
+A variety of options are available to control the registration process (see screenshot below):
+
+* Image Stack: The image layer that should be registered/transformed.
+* Transformation: The type of transformation that should be applied.
+  - translation
+  - rigid body (translation + rotation)
+  - scaled rotation (translation + rotation + scaling)
+  - affine (translation + rotation + scaling + shearing)
+  - bilinear (non-linear transformation; does not preserve straight lines)
+* Reference Image: The reference image for registration.
+  - Previous frame: Aligns each frame (image) to its previous frame in the stack
+  - Mean (all frames): Aligns each frame (image) to the average of all images in the stack
+  - Mean (first n frames): Aligns each frame (image) to the mean of the first n frames in the stack. n is a tuneable parameter.
+* Moving Average stack before register: Apply a moving average to the stack before registration. This can be useful to
+  reduce noise in the stack (if the signal-to-noise ratio is very low). The moving average is applied to the stack only
+  for determining the transformation matrices, but not for the actual transforming of the stack.
+* Transformation matrix file: Transformation matrices can be saved to or loaded from a file for permanent storage.
+
+
+The ``Reference Image`` option
+allows you to
+
+![](https://github.com/glichtner/napari-pystackreg/raw/update-docs/docs/ui-initial.png)
+
+
+
+###
 
 
 ----------------------------------
