@@ -1,4 +1,5 @@
 import os
+import sys
 
 import napari
 import numpy as np
@@ -16,6 +17,12 @@ from qtpy.QtWidgets import (
     QSpinBox,
     QWidget,
 )
+
+from _util import patch_worker_for_coverage
+
+running_coverage = (
+    "coverage" in sys.modules or "pytest" in sys.modules
+)  # detect if coverage is running to enable correct handling of QThreads
 
 
 def connect_visibility_to_checkbox(
@@ -76,7 +83,9 @@ class PystackregWidget(QWidget):
     def __init__(self, napari_viewer):
         super().__init__()
         self.viewer = napari_viewer
-        self.viewer.events.layers_change.connect(self._on_layer_change)
+
+        self.viewer.layers.events.inserted.connect(self._on_layer_change)
+        self.viewer.layers.events.removed.connect(self._on_layer_change)
 
         # Parameters
         self.tmats = None
@@ -343,6 +352,9 @@ class PystackregWidget(QWidget):
         n_frames = self.n_frames.value()
         reference = self.reference.currentData()
 
+        if reference not in self.REFERENCES:
+            raise ValueError(f'Unknown reference "{reference}"')
+
         image = self.image.currentData()
 
         self.pbar.setMaximum(image.shape[0] - 1)
@@ -363,48 +375,50 @@ class PystackregWidget(QWidget):
             axis = 0
 
             if action in ["register", "register_transform"]:
-
+                image_reg = image
                 idx_start = 1
 
                 if moving_average > 1:
                     idx_start = 0
-                    size = [0] * len(image.shape)
+                    size = [0] * len(image_reg.shape)
                     size[axis] = moving_average
-                    image = running_mean(image, moving_average, axis=axis)
+                    image_reg = running_mean(
+                        image_reg, moving_average, axis=axis
+                    )
 
                 tmatdim = 4 if transformation == "bilinear" else 3
 
                 tmats = np.repeat(
                     np.identity(tmatdim).reshape((1, tmatdim, tmatdim)),
-                    image.shape[axis],
+                    image_reg.shape[axis],
                     axis=0,
                 ).astype(np.double)
 
                 if reference == "first":
                     ref = np.mean(
-                        image.take(range(n_frames), axis=axis), axis=axis
+                        image_reg.take(range(n_frames), axis=axis), axis=axis
                     )
                 elif reference == "mean":
-                    ref = image.mean(axis=0)
+                    ref = image_reg.mean(axis=0)
                     idx_start = 0
                 elif reference == "previous":
                     pass
-                else:
+                else:  # pragma: no cover - can't be reached due to check above
                     raise ValueError(f'Unknown reference "{reference}"')
 
                 self.pbar_label.setText("Registering...")
 
-                iterable = range(idx_start, image.shape[axis])
+                iterable = range(idx_start, image_reg.shape[axis])
 
                 for i in iterable:
-                    slc = [slice(None)] * len(image.shape)
+                    slc = [slice(None)] * len(image_reg.shape)
                     slc[axis] = i
 
                     if reference == "previous":
-                        ref = image.take(i - 1, axis=axis)
+                        ref = image_reg.take(i - 1, axis=axis)
 
                     tmats[i, :, :] = sr.register(
-                        ref, simple_slice(image, i, axis)
+                        ref, simple_slice(image_reg, i, axis)
                     )
 
                     if reference == "previous" and i > 0:
@@ -462,6 +476,11 @@ class PystackregWidget(QWidget):
             self.viewer.add_image(data=img, name=layer_name)
 
         self.worker = _register_stack(image)
+
+        if running_coverage:
+            # workaround for coverage, which does not detect QThread properly
+            # see https://github.com/nedbat/coveragepy/issues/686
+            patch_worker_for_coverage(self.worker)
         self.worker.yielded.connect(on_yield)
         self.worker.returned.connect(on_return)
         self.worker.start()
