@@ -1,7 +1,11 @@
-# pragma: no cover
 import sys
 import threading
 import types
+
+try:  # pragma: no cover
+    DEBUGGING = True
+except ImportError:
+    DEBUGGING = False
 
 
 def _work_qthread_aware_coverage(worker):  # pragma: no cover
@@ -34,4 +38,5 @@ def patch_worker_for_coverage(worker):  # pragma: no cover
         (e.g. from @thread_worker decorator)
     :return: worker with patched work() method
     """
-    worker.work = _work_qthread_aware_coverage(worker)
+    if not DEBUGGING:
+        worker.work = _work_qthread_aware_coverage(worker)
