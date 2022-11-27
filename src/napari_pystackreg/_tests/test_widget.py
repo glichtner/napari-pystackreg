@@ -122,6 +122,27 @@ def stack_affine(tmp_path_factory):
     return load_file(tmp_path_factory, "reg-affine")
 
 
+def worker_function(qtbot, widget, func):
+    func(True)
+
+    with qtbot.waitSignal(
+        widget.worker.finished, timeout=30000, raising=False
+    ) as blocker:  # noqa: F841
+        pass
+
+
+def register_image(qtbot, widget):
+    worker_function(qtbot, widget, widget._btn_register_onclick)
+
+
+def transform_image(qtbot, widget):
+    worker_function(qtbot, widget, widget._btn_transform_onclick)
+
+
+def register_transform_image(qtbot, widget):
+    worker_function(qtbot, widget, widget._btn_register_transform_onclick)
+
+
 def test_pystackreg_widget(
     qtbot, make_napari_viewer, stack_unregistered, stack
 ):
@@ -145,12 +166,7 @@ def test_pystackreg_widget(
         references.remove("previous")
         widget.reference.setCurrentIndex(references.index("first"))
 
-    widget._btn_register_transform_onclick(True)
-
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
+    register_transform_image(qtbot, widget)
 
     np.testing.assert_array_equal(viewer.layers[0].data, stack_unregistered)
     np.testing.assert_allclose(
@@ -203,12 +219,7 @@ def test_pystackreg_widget_moving_average(
 
     widget.moving_average.setValue(n_mov_avg)
 
-    widget._btn_register_transform_onclick(True)
-
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
+    register_transform_image(qtbot, widget)
 
     np.testing.assert_array_equal(viewer.layers[0].data, stack_unregistered)
 
@@ -235,13 +246,10 @@ def test_pystackreg_widget_reference_mean(
 
     widget.reference.setCurrentIndex(references.index("mean"))
 
-    widget._btn_register_transform_onclick(True)
+    register_transform_image(qtbot, widget)
 
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
     assert len(viewer.layers) == 2
+
     np.testing.assert_array_equal(viewer.layers[0].data, stack_unregistered)
 
     # todo: add comparison for affine transformation to mean reference
@@ -254,12 +262,8 @@ def test_pystackreg_widget_register_transform_buttons(
 
     # Transform button should be disabled
     assert widget.btn_transform.isEnabled() is False
-    widget._btn_register_onclick(True)
 
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
+    register_image(qtbot, widget)
 
     # Transform button should be enabled now (after registration)
     assert widget.btn_transform.isEnabled() is True
@@ -268,12 +272,7 @@ def test_pystackreg_widget_register_transform_buttons(
     assert len(viewer.layers) == 1
 
     # Perform transformation
-    widget._btn_transform_onclick(True)
-
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
+    transform_image(qtbot, widget)
 
     # Now there should be two layers (one each for unregisterd, registered)
     assert len(viewer.layers) == 2
@@ -300,12 +299,7 @@ def test_pystackreg_widget_tmat_file(
 
     assert widget.btn_tmat_save.isEnabled() is False
 
-    widget._btn_register_onclick(True)
-
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
+    register_image(qtbot, widget)
 
     assert widget.btn_tmat_save.isEnabled() is True
     tmat_fname = tmp_path / "test.npy"
@@ -347,12 +341,7 @@ def test_pystackreg_widget_tmat_file(
     np.testing.assert_allclose(widget.tmats, tmat_affine, rtol=1e-7, atol=1)
 
     # Perform transformation
-    widget._btn_transform_onclick(True)
-
-    with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
-    ) as blocker:  # noqa: F841
-        pass
+    transform_image(qtbot, widget)
 
     # Now there should be two layers (one each for unregistered, registered)
     assert len(viewer.layers) == 2
