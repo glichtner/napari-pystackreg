@@ -13,7 +13,7 @@ Robust image registration for napari.
 napari-pystackreg offers the image registration capabilities of the python package
 [pystackreg](https://github.com/glichtner/pystackreg) for napari.
 
-![](https://github.com/glichtner/napari-pystackreg/raw/update-docs/docs/napari-pystackreg.gif)
+![](https://github.com/glichtner/napari-pystackreg/raw/main/docs/napari-pystackreg.gif)
 
 ## Description
 
