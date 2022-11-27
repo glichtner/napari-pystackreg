@@ -45,31 +45,6 @@ def stack_unregistered(tmp_path_factory):
     yield load_file(tmp_path_factory, "unreg")
 
 
-@pytest.fixture(scope="session")
-def stack_translation(tmp_path_factory):
-    yield load_file(tmp_path_factory, "reg-translation")
-
-
-@pytest.fixture(scope="session")
-def stack_rigid_body(tmp_path_factory):
-    yield load_file(tmp_path_factory, "reg-rigid-body")
-
-
-@pytest.fixture(scope="session")
-def stack_scaled_rotation(tmp_path_factory):
-    yield load_file(tmp_path_factory, "reg-scaled-rotation")
-
-
-@pytest.fixture(scope="session")
-def stack_affine(tmp_path_factory):
-    yield load_file(tmp_path_factory, "reg-affine")
-
-
-@pytest.fixture(scope="session")
-def stack_bilinear(tmp_path_factory):
-    yield load_file(tmp_path_factory, "reg-bilinear")
-
-
 @pytest.fixture(
     params=[
         "translation",
