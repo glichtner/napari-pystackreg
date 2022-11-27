@@ -83,7 +83,9 @@ class PystackregWidget(QWidget):
     def __init__(self, napari_viewer):
         super().__init__()
         self.viewer = napari_viewer
-        self.viewer.events.layers_change.connect(self._on_layer_change)
+        self.viewer.layers.selection.events.changed.connect(
+            self._on_layer_change
+        )
 
         # Parameters
         self.tmats = None
