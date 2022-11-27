@@ -3,6 +3,8 @@ import threading
 import types
 
 try:  # pragma: no cover
+    import pydevd  # noqa: F401
+
     DEBUGGING = True
 except ImportError:
     DEBUGGING = False
