@@ -284,7 +284,7 @@ def test_pystackreg_widget_tmat_file(
     widget._btn_register_onclick(True)
 
     with qtbot.waitSignal(
-        widget.worker.finished, timeout=30000
+        widget.worker.finished, timeout=60000
     ) as blocker:  # noqa: F841
         pass
 
