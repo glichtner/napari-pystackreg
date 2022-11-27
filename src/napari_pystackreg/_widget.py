@@ -1,4 +1,5 @@
 import os
+import sys
 
 import napari
 import numpy as np
@@ -16,6 +17,12 @@ from qtpy.QtWidgets import (
     QSpinBox,
     QWidget,
 )
+
+from _util import patch_worker_for_coverage
+
+running_coverage = (
+    "coverage" in sys.modules
+)  # detect if coverage is running to enable correct handling of QThreads
 
 
 def connect_visibility_to_checkbox(
@@ -462,6 +469,11 @@ class PystackregWidget(QWidget):
             self.viewer.add_image(data=img, name=layer_name)
 
         self.worker = _register_stack(image)
+
+        if running_coverage:
+            # workaround for coverage, which does not detect QThread properly (
+            # see https://github.com/nedbat/coveragepy/issues/686)
+            patch_worker_for_coverage(self.worker)
         self.worker.yielded.connect(on_yield)
         self.worker.returned.connect(on_return)
         self.worker.start()
