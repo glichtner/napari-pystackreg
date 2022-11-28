@@ -18,7 +18,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from _util import patch_worker_for_coverage
+from ._util import patch_worker_for_coverage
 
 running_coverage = (
     "coverage" in sys.modules or "pytest" in sys.modules
