@@ -441,7 +441,7 @@ class PystackregWidget(QWidget):
 
                 # transform
 
-                out = image.copy().astype(np.float)
+                out = image.copy().astype(float)
 
                 self.pbar_label.setText("Transforming...")
                 yield 0  # reset pbar
